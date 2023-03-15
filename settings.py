@@ -1,10 +1,7 @@
 from typing import List
 
-from simplechain.examples.AccessibilityBot.inputs.input import Input
-from simplechain.examples.AccessibilityBot.inputs.keyboard import Keyboard
-from simplechain.examples.AccessibilityBot.inputs.voice import Voice
-from simplechain.examples.AccessibilityBot.outputs.audio import Audio
-from simplechain.examples.AccessibilityBot.outputs.output import Output
+from inputs import Input
+from outputs.output import Output
 
 
 def supported_langagues():
@@ -12,11 +9,11 @@ def supported_langagues():
 
 class Settings:
     def __init__(self):
-        language: str = "English"
-        inputs: List[Input] = [Voice()]
-        outputs: List[Output] = [Audio()]
-        keyword_detection: bool = True
-        keyword: str = "Hey NavBot"
+        self.language: str = "English"
+        self.inputs: List[Input] = []
+        self.outputs: List[Output] = []
+        self.keyword_detection: bool = True
+        self.keyword: str = "Hey NavBot"
 
     def set_language(self, language: str):
         self.language = language

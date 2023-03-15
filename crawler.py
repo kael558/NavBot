@@ -1,4 +1,7 @@
 from sys import platform
+import os
+import openai
+
 
 from playwright.sync_api import sync_playwright
 import time
@@ -8,6 +11,7 @@ black_listed_elements = {"html", "head", "title", "meta", "iframe", "body", "scr
 
 class Crawler:
     def __init__(self):
+        openai.api_key = os.getenv("OPENAI_API_KEY")
         self.browser = (
             sync_playwright()
             .start()
@@ -21,6 +25,7 @@ class Crawler:
 
     def go_to_page(self, url):
         self.page.goto(url=url if "://" in url else "http://" + url)
+
         self.client = self.page.context.new_cdp_session(self.page)
         self.page_element_buffer = {}
 
@@ -60,7 +65,7 @@ class Crawler:
     def enter(self):
         self.page.keyboard.press("Enter")
 
-    def crawl(self):
+    def get_elements_of_interest(self):
         page = self.page
         page_element_buffer = self.page_element_buffer
         start = time.time()
@@ -384,3 +389,26 @@ class Crawler:
 
         print("Parsing time: {:0.2f} seconds".format(time.time() - start))
         return elements_of_interest
+
+    def get_page_description(self):
+        page = self.page
+        content = page.content()
+        response = openai.Completion.create(
+            model="gpt-3.5-turbo",# text-davinci-003
+            prompt=f"Summarize this html to describe the website:\n\n{content}",
+            temperature=0.7,
+            max_tokens=256,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0
+        )
+        print(response)
+        return response.get("choices")[0].get("text")
+
+    def decide(self):
+        page = self.page
+        page_elements = self.get_elements_of_interest()
+        page_description = self.get_page_description()
+        print(page_description)
+        print(page_elements)
+        return page_elements, page_description

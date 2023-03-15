@@ -60,5 +60,12 @@
  - [ ] Salient information only
  - [ ] Answer questions about images
 
+## Code Flow
+1. Ask user for input
+2. Navigate to web page
+3. Read web page, summarize contents, get links, key elements
+4. Should I continue to issue commands and navigate or should I ask the user to clarify?
+5. If i ask the user to clarify, I will describe the web page to them and what options they have.
+
 
 

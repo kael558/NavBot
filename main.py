@@ -11,8 +11,12 @@ from sys import argv, exit, platform
 import openai
 import os
 
-from simplechain.examples.AccessibilityBot.crawler import Crawler
-from simplechain.examples.AccessibilityBot.prompts import prompt_template
+from dotenv import load_dotenv
+
+from crawler import Crawler
+from inputs import Voice
+from prompts import prompt_template
+from settings import Settings
 
 quiet = False
 if len(argv) >= 2:
@@ -24,11 +28,23 @@ if len(argv) >= 2:
         )
 
 
-
 def send_command():
     pass
 
-if __name__ == "__main__":
+
+def test_voice():
+    load_dotenv()
+    settings = Settings()
+
+    v = Voice(settings)
+    v.start()
+
+    input("Press enter to stop")
+    v.stop()
+
+
+def main():
+    load_dotenv()
     _crawler = Crawler()
     openai.api_key = os.environ.get("OPENAI_API_KEY")
 
@@ -38,8 +54,7 @@ if __name__ == "__main__":
             "(h) to view commands again\n(r/enter) to run suggested command\n(o) change objective"
         )
 
-
-    def get_gpt_command(objective, url, previous_command, browser_content):
+    def get_gpt_command(objective, url, previous_command, browser_content, page_desc):
         prompt = prompt_template
         prompt = prompt.replace("$objective", objective)
         prompt = prompt.replace("$url", url[:100])
@@ -48,7 +63,6 @@ if __name__ == "__main__":
         response = openai.Completion.create(model="text-davinci-003", prompt=prompt, temperature=0.5, best_of=10, n=3,
                                             max_tokens=50)
         return response.choices[0].text
-
 
     def run_cmd(cmd):
         cmd = cmd.split("\n")[0]
@@ -75,7 +89,6 @@ if __name__ == "__main__":
 
         time.sleep(2)
 
-
     objective = "Make a reservation for 2 at 7pm at bistro vida in menlo park"
     print("\nWelcome to natbot! What is your objective?")
     i = input()
@@ -87,7 +100,8 @@ if __name__ == "__main__":
     _crawler.go_to_page("google.com")
     try:
         while True:
-            browser_content = "\n".join(_crawler.crawl())
+            browser_content = "\n".join(_crawler.get_elements_of_interest())
+            browser_desc = _crawler.get_page_description()
             prev_cmd = gpt_cmd
             gpt_cmd = get_gpt_command(objective, _crawler.page.url, prev_cmd, browser_content)
             gpt_cmd = gpt_cmd.strip()
@@ -127,3 +141,10 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n[!] Ctrl+C detected, exiting gracefully.")
         exit(0)
+
+
+if __name__ == "__main__":
+    d = open("recordings/audio_file_0.wav", "rb")
+    print(d)
+    print(type(d))
+    print(d.read())

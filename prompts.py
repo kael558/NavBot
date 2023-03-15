@@ -127,6 +127,8 @@ The current browser content, objective, and current URL follow. Reply with your 
 
 CURRENT BROWSER CONTENT:
 ------------------
+$page_description
+------------------
 $browser_content
 ------------------
 
