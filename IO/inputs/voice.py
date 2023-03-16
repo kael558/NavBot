@@ -5,8 +5,10 @@ import threading
 import openai
 import speech_recognition as sr
 
-from inputs.input import Input
+from IO.inputs.input import Input
 import io
+
+from settings import Settings
 
 
 class NamedBufferedReader(io.BufferedReader):
@@ -24,7 +26,14 @@ class NamedBufferedReader(io.BufferedReader):
 
 
 class Voice(Input):
-    def __init__(self, settings, output_queue: queue.Queue):
+    _instance = None
+
+    def __new__(cls, queue: queue.Queue, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self, settings: Settings, output_queue: queue.Queue):
         super().__init__(output_queue)
         openai.api_key = os.environ.get("OPENAI_API_KEY")
 
@@ -68,7 +77,7 @@ class Voice(Input):
                 self.transcribe_queue.put(None)
                 break
 
-    def _get_input(self):
+    def _input(self):
         # Read a segment from the queue
         audio_file_wav_data = self.transcribe_queue.get(block=True)
         if audio_file_wav_data is None:

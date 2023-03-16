@@ -44,15 +44,17 @@
 
 ## TODO
  - [ ] Settings implementation
- - [ ] Implement mic input and transcription module - https://platform.openai.com/docs/guides/speech-to-text/prompting
+ - [x] Implement mic input and transcription module - https://platform.openai.com/docs/guides/speech-to-text/prompting
  - [ ] Implement eye tracker input module
  - [ ] Implement keyboard input module
- - [ ] Implement audio output module
+ - [x] Implement audio output module
  - [ ] Implement simpler visual output module
  - [ ] Connect inputs to crawler
  - [ ] Handle reading output for different module
 
 ## Extra
+ - [ ] Push to activate input
+ - [ ] Pause button to stop input
  - [ ] Colorblindness handling
  - [ ] Large text
  - [ ] High contrast

@@ -7,16 +7,16 @@
 
 import queue
 import time
-from sys import argv, exit, platform
+from sys import argv, exit
 import openai
 import os
 
 from dotenv import load_dotenv
 
 from crawler import Crawler
-from inputs import Voice
+from IO.inputs import Voice
+from IO.outputs import Audio
 from prompts import prompt_template
-from settings import Settings
 
 quiet = False
 if len(argv) >= 2:
@@ -27,19 +27,95 @@ if len(argv) >= 2:
             + "exercise caution when running suggested commands."
         )
 
+
+
+
 class NavBot:
     def __init__(self) -> None:
         self._crawler = Crawler()
         self._settings = Settings()
-        self._output_queue = queue.Queue()
+
+        self._input_queue = queue.Queue()  # Input from users
+        self._output_queue = queue.Queue()  # Output to users
+
+        self.chat_history = ""
+
+        self._inputs = {"Voice": Voice(self._settings, self._input_queue)}
+        self._outputs = {"Audio": Audio(self._settings, self._output_queue)}
+
+    def toggle_input(self, input_name: str):
+        if input_name in self._inputs:
+            self._inputs[input_name].toggle()
+        else:
+            print(f"Input {input_name} not found.")
+
+    def toggle_output(self, output_name: str):
+        if output_name in self._outputs:
+            self._outputs[output_name].toggle()
+        else:
+            print(f"Output {output_name} not found.")
+
+    def receive_input(self, block: bool):
+        if self._input_queue.empty():
+            return None
+
+        res = self._input_queue.get(block=block)
+        self.chat_history += "User: " + res + "\n"
+        return res
 
 
-        self._voice = Voice(self._settings)
-        self._voice.set_output_queue(self)
+    def send_output(self, text: str):
+        self.chat_history += "NavBot: " + text + "\n"
+        self._output_queue.put(text)
+
+    def get_question_or_command(self):
+        # chat history
+        # current web desc
+        # current web url
+        # url tree (list of urls)
+
+        pass
+
+    def run(self):
+        response = "Hi, I'm NavBot. I will be your guide on the web. How can I help you today?"
+        self._output_queue.put(response)
+        user_response = self.receive_input(block=True)
+
+        while True:
+            # Generate a question or generate a command
+            """
+            1. Question or command:
+            
+            1. if question
+            2. generate response with question and web desc, send the response to the user
+            3. wait for their input
+            
+            1. if command
+            2. generate response with command and web desc and send response to user
+            3. send the command to the handler and crawl the new page
+            4. check if the user has said anything
+            
+            1. if the user has said something, then clear the output queue
+            2. and go back to step 1 Question or command
+            """
 
 
-def send_command():
-    pass
+            res = self.receive_input(block=True)
+            while True:
+
+                if res is not None:
+                    # Clear the output queue
+
+                    # Process the input
+                    pass
+
+                    # Clear the output queue
+
+
+                # Send the output
+
+
+
 
 
 def test_voice():
@@ -115,14 +191,10 @@ def main():
             output_type.output(llm_response)
             input_type.start()
 
-
-
             pass
     except KeyboardInterrupt:
         print("\n[!] Ctrl+C detected, exiting gracefully.")
         exit(0)
-        
-
 
     objective = "Make a reservation for 2 at 7pm at bistro vida in menlo park"
     print("\nWelcome to natbot! What is your objective?")
@@ -181,6 +253,7 @@ def main():
 if __name__ == "__main__":
     load_dotenv()
     from settings import Settings
+
     output_queue = queue.Queue()
     settings = Settings()
     v = Voice(settings, output_queue)

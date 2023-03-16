@@ -1,7 +1,7 @@
 from typing import List
 
-from inputs import Input
-from outputs.output import Output
+from IO.inputs import Input
+from IO.outputs.output import Output
 
 
 def supported_langagues():
