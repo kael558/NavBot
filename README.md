@@ -68,4 +68,37 @@
 5. If i ask the user to clarify, I will describe the web page to them and what options they have.
 
 
+Start a thread to get input data and pass in the queue to put the transcriptions in
+
+Main will get the instruction, 
+It should decide whether to issue a command or to ask the user to clarify
+
+While it is issuing commands:
+
+If it issues a command:
+ - it says what it is doing
+ - and performs that command
+
+If it asks a question:
+ - it sends that question 
+
+
+# start thread for input
+# start thread for output
+# while true:
+  # main is listening for input
+  # While true
+  #    if new input is received (non-blocking), add to chat history
+  #    issue command, send narration
+  #    if question, send question, break
+  
+
+
+
+
+
+
+Audio is asynchronous so..
+
+
 
