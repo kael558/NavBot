@@ -9,22 +9,32 @@ class Input(ABC):
         self._stop_event = threading.Event()
         
     def start(self):
+        self._start()
         t = threading.Thread(target=self.start_running_thread)
         t.start()
         return t
 
     def start_running_thread(self):
         while not self._stop_event.is_set():
-            res = self.get_input()
+            res = self._get_input()
             if res is None:
                 break
             self._output_queue.put(res)
 
     def stop(self):
+        self._stop()
         self._stop_event.set()
-    
+
     @abstractmethod
-    def get_input(self):
+    def _start(self):
+        pass
+
+    @abstractmethod
+    def _stop(self):
+        pass
+
+    @abstractmethod
+    def _get_input(self):
         pass
     
 

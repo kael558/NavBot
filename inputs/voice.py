@@ -1,4 +1,3 @@
-
 import os
 import queue
 import threading
@@ -8,6 +7,7 @@ import speech_recognition as sr
 
 from inputs.input import Input
 import io
+
 
 class NamedBufferedReader(io.BufferedReader):
     def __init__(self, name, *args, **kwargs):
@@ -22,6 +22,7 @@ class NamedBufferedReader(io.BufferedReader):
     def name(self, value):
         self._name = value
 
+
 class Voice(Input):
     def __init__(self, settings, output_queue: queue.Queue):
         super().__init__(output_queue)
@@ -29,31 +30,15 @@ class Voice(Input):
 
         self.settings = settings
 
-        # Thread-safe queue to save audio segments
-        #self.audio_queue = queue.Queue()
-
         # Thread-safe queue to transcribe audio segments
         self.transcribe_queue = queue.Queue()
-        self.i = 0
 
-        self.start_threads()
-
-
-    def start_threads(self):
-        #saving_thread = threading.Thread(target=self.save)
-        #saving_thread.start()
-
-        #transcribing_thread = threading.Thread(target=self.transcribe)
-        #transcribing_thread.start()
-
+    def _start(self):
         listening_thread = threading.Thread(target=self.listen)
         listening_thread.start()
 
-    def stop(self):
+    def _stop(self):
         self.transcribe_queue.put(None)
-        #self.audio_queue.put(None)
-        self._stop_event.set()
-
 
     def listen(self):
         r = sr.Recognizer()
@@ -70,48 +55,28 @@ class Voice(Input):
                     r.adjust_for_ambient_noise(source, duration=0.2)
 
                     # listens for the user's input
-                    audio = r.listen(source)
+                    audio = r.listen(source, timeout=60)
 
                     # Put audio segment in queue
                     self.transcribe_queue.put(audio.get_wav_data())
-                    #self.audio_queue.put(audio)
             except sr.RequestError as e:
                 print("Could not request results; {0}".format(e))
-
             except sr.UnknownValueError:
                 print("unknown error occurred")
-        pass
-
-    def save(self):
-        directory = "recordings"
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-
-        while not self._stop_event.is_set():
-            # Read a segment from the queue
-            segment = self.audio_queue.get(block=True)
-            if segment is None:
+            except sr.WaitTimeoutError:
+                print("Timeout")
+                self.transcribe_queue.put(None)
                 break
-            nbr = NamedBufferedReader(f"audio_file_{self.i}.wav", segment.get_wav_data())
-            self.transcribe_queue.put(nbr)
-            self.i += 1
-            path_to_audio_file = f"{directory}/audio_file_{self.i}.wav"
-            with open(path_to_audio_file, "wb") as f:
-                f.write(segment.get_wav_data())
-                f.close()
-            self.i += 1
-            self.transcribe_queue.put(path_to_audio_file)
 
-    
-    def get_input(self):
+    def _get_input(self):
         # Read a segment from the queue
         audio_file_wav_data = self.transcribe_queue.get(block=True)
         if audio_file_wav_data is None:
             return None
-        
+
         byte_stream = io.BytesIO(audio_file_wav_data)
-        audio_file = NamedBufferedReader(f"audio_file_{self.i}.wav", raw=byte_stream)
-        #audio_file = open(path_to_audio_file, "rb")
+        audio_file = NamedBufferedReader(f"audio_file.wav", raw=byte_stream)
+        # audio_file = open(path_to_audio_file, "rb")
         if self.settings.language != "English":
             transcript = openai.Audio.translate("whisper-1", audio_file)
         else:
@@ -120,4 +85,3 @@ class Voice(Input):
         print("--TRANSCRIPT--")
         print(transcript)
         return transcript
-
