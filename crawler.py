@@ -9,6 +9,7 @@ import time
 black_listed_elements = {"html", "head", "title", "meta", "iframe", "body", "script", "style", "path", "svg", "br",
                          "::marker"}
 
+
 class Crawler:
     def __init__(self):
         openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -23,6 +24,7 @@ class Crawler:
         self.page = self.browser.new_page()
         self.page.set_viewport_size({"width": 1280, "height": 1080})
         self.url_history = []
+        self.commands = []
 
     def run_command(self, cmd):
         cmd = cmd.split("\n")[0]
@@ -420,7 +422,7 @@ class Crawler:
 
     def get_page_description(self):
         page = self.page
-        #content = page.inner_text()
+        # content = page.inner_text()
         # Find all the <a> elements on the page
         links = page.query_selector_all('a')
 
@@ -430,7 +432,7 @@ class Crawler:
 
             # Find all the child elements of the link and aggregate their text content
             text = ' '.join([child.text_content().strip() for child in link.query_selector_all('*')]).strip()
-            
+
             if text != '':
                 # Add the href and text data to a dictionary and append it to the link_data list
                 link_data.append({'href': href, 'text': text})
@@ -439,7 +441,7 @@ class Crawler:
         print("--------------")
         exit()
         response = openai.Completion.create(
-            model="text-davinci-003",# gpt-3.5-turbo
+            model="text-davinci-003",  # gpt-3.5-turbo
             prompt=f"Summarize this html to describe the website:\n\n{content}",
             temperature=0.7,
             max_tokens=256,
@@ -457,15 +459,23 @@ class Crawler:
         print(page_description)
         print(page_elements)
         return page_elements, page_description
-    
+
+    def get_current_url(self):
+        return self.page.url
+
+    def get_previous_command(self):
+        return self.commands[-1]
+
+
 from dotenv import load_dotenv
+
 if __name__ == "__main__":
     load_dotenv()
     crawler = Crawler()
     crawler.go_to_page("https://www.sephora.com/ca/en/shop/eyeshadow-palettes")
     eoi = crawler.get_elements_of_interest()
-    #page_desc = crawler.get_page_description()
+    # page_desc = crawler.get_page_description()
     print('\n'.join(eoi))
-    
+
     print("--------")
-    #print(page_desc)
+    # print(page_desc)

@@ -96,7 +96,17 @@ If it asks a question:
   
 
 
+options 
+ - inputs: user, new page
+ - if user says something: generate new objective given chat history
+ - if new page is loaded:
+   - 
+       - generate command from objective, web content
+       - if command is finish
+         - break loop and wait for user input
+       - 
 
+ - generate objective from chat history, 
 
 
 
