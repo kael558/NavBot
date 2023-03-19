@@ -8,16 +8,19 @@
 import queue
 import time
 from sys import argv, exit
+from typing import Optional, Tuple, Any
+
 import openai
 import os
 
 from dotenv import load_dotenv
 
-from crawler import Crawler
-from IO.inputs import Voice
+from IO.inputs.input import Input
+from IO.outputs.output import Output
+from crawler import Crawler, get_page_description
+from IO.inputs import Voice, __all__
 from IO.outputs import Audio
-from prompts import question_objective_prompt_template, objective_prompt_template, command_prompt_template, \
-    command_template
+from prompts import command_template, objective_template
 
 quiet = False
 if len(argv) >= 2:
@@ -29,137 +32,152 @@ if len(argv) >= 2:
         )
 
 
-class NavBot:
-    def __init__(self) -> None:
-        self._crawler = Crawler()
-        self._settings = Settings()
+class Message:
+    def __init__(self, role: str, content: str):
+        self.role = role
+        self.content = content
 
-        self._input_queue = queue.Queue()  # Input from users
-        self._output_queue = queue.Queue()  # Output to users
 
-        self.chat_history = ""
-        self.commands = []
-        self.objective = None
 
-        self._inputs = {"Voice": Voice(self._settings, self._input_queue)}
-        self._outputs = {"Audio": Audio(self._settings, self._output_queue)}
 
-    def toggle_input(self, input_name: str):
-        if input_name in self._inputs:
-            self._inputs[input_name].toggle()
-        else:
-            print(f"Input {input_name} not found.")
+def check_for_settings_change(user_response) -> Optional[Tuple[str, Any]]:
+    # Match to setting using vectordb
+    # Match to setting values using vectordb
 
-    def toggle_output(self, output_name: str):
-        if output_name in self._outputs:
-            self._outputs[output_name].toggle()
-        else:
-            print(f"Output {output_name} not found.")
+    pass
 
-    def receive_input(self, block: bool):
-        if self._input_queue.empty():
-            return None
 
-        res = self._input_queue.get(block=block)
-        self.chat_history += "User: " + res + "\n"
-        return res
+def confirmed(user_response):
+    # match to yes/no using vectordb
+    pass
 
-    def send_output(self, text: str):
-        self.chat_history += "NavBot: " + text + "\n"
-        self._output_queue.put(text)
+def run():
+    load_dotenv()
+    openai.api_key = os.environ.get("OPENAI_API_KEY")
+    crawler = Crawler()
+    settings = Settings()
 
-    def get_command(self, objective: str, elements_of_interest: str, page_description):
-        # chat history
-        # current web desc
-        # current web url
-        # url tree (list of urls)
+    input_queue = queue.Queue()  # Input from users
+    output_queue = queue.Queue()  # Output to users
 
-        prompt = command_template(
-            browser_content=elements_of_interest,
-            page_description=page_description,
-            url=self._crawler.get_current_url(),
-            previous_command=self._crawler.get_previous_command(),
-        )
+    inputs = {"Voice": Voice(settings, input_queue)}
+    outputs = {"Audio": Audio(settings, output_queue)}
 
-        response = openai.Completion.create(model="text-davinci-003", prompt=prompt, temperature=0.5, best_of=10, n=3,
-                                            max_tokens=50)
-        return response.choices[0].text
+    chat_history = []
+    response = "Hi, I'm NavBot. I will be your guide on the web. How can I help you today?"
+    navbot_response = Message("navbot", response)
+    output_queue.put(navbot_response)
 
-        pass
+    try:
+        while True:
+            # Get user input
+            user_response = receive_input(input_queue, block=True)
+            settings_change = check_for_settings_change(user_response)
+            if settings_change is not None:
+                # Ask the user to confirm the settings change
+                send_output(output_queue, settings_change)
+                settings_change_confirmation = receive_input(input_queue, block=True)
+                if confirmed(settings_change_confirmation):
+                    # Change the settings
+                    settings.change_setting(settings_change)
+                    continue
 
-    def handle_command(self, command):
-        """
-        run the command
-        update the url tree, web desc, and web url
-        """
-        self._crawler.run_command(command)
 
-    def get_objective(self, user_response):
-        prompt = objective_prompt_template.format(
-            chat_history=self.chat_history,
-        )
+            chat_history.append(user_response)
+            objective = get_objective(chat_history)
 
-        return openai.Completion.create(model="text-davinci-003",
+            while True:
+                # Generate command, given objective, current web desc, current web url
+                elements_of_interest, page_desc = crawler.get_page_contents()
+                command = get_command(crawler, objective, elements_of_interest, page_desc)
+
+                if command == "Finish" or command.startswith("Question"):
+                    # Objective is achieved, ask user what is next
+                    break
+
+                # Run command
+                if settings.verbose:
+                    # Map actions to string outputs
+                    send_output(output_queue, command)
+                crawler.run_command(command)
+
+                # Check if user has said anything
+                optional_user_input = receive_input(input_queue, block=False)
+                chat_history.append(optional_user_input)
+
+                if optional_user_input is not None:
+                    # Clear the output queue
+                    while not output_queue.empty():
+                        output_queue.get()
+
+                    # Update the objective
+                    objective = get_objective(chat_history)
+            # Given web description, given options for user. Summarize them and ask user what to do next
+            send_output(output_queue, "What would you like to do next?", )
+
+
+
+
+    except KeyboardInterrupt:
+        send_output(output_queue, "Thank you for using NavBot. Goodbye!")
+        print("\n[!] Ctrl+C detected, exiting gracefully.")
+        exit(0)
+
+
+def toggle_input(input_name: str, inputs: dict[str, Input]):
+    if input_name in inputs:
+        inputs[input_name].toggle()
+    else:
+        print(f"Input {input_name} not found.")
+
+
+def toggle_output(output_name: str, outputs: dict[str, Output]):
+    if output_name in outputs:
+        outputs[output_name].toggle()
+    else:
+        print(f"Output {output_name} not found.")
+
+
+def receive_input(input_queue: queue, block: bool) -> Optional[Message]:
+    user_input = input_queue.get(block=block)
+    if user_input is None:
+        return None
+    return Message("user", user_input)
+
+
+def send_output(output_queue: queue, text: str):
+    output_queue.put(text)
+
+
+def get_command(crawler: Crawler, objective: str, elements_of_interest: str, page_description):
+    prompt = command_template(
+        objective=objective,
+        browser_content=elements_of_interest,
+        page_description=page_description,
+        url=crawler.get_current_url(),
+        previous_command=crawler.get_previous_command(),
+    )
+
+    response = openai.Completion.create(model="text-davinci-003",
                                         prompt=prompt,
                                         temperature=0.5,
                                         best_of=10,
                                         n=3,
                                         max_tokens=50)
-
-    def run(self):
-        response = "Hi, I'm NavBot. I will be your guide on the web. How can I help you today?"
-        self._output_queue.put(response)
-        user_response = self.receive_input(block=True)
-        self.objective = get_objective(user_response)
-        try:
-            while True:
-                # Generate a question or generate a command
-                """
-
-                1. user input
-                2. use vector db to check if input wants to change settings
-                3. given the chat history, generate a question or a command (could be nothing)
-     
-                1. if ask user question
-                2. generate response with question and web desc, send the response to the user
-                3. wait for their input
-
-                4. if no question
-                5. get objective of 
-                2. generate response with command and web desc and send response to user
-                3. send the command to the handler and crawl the new page
-                4. check if the user has said anything
-                
-                
-                1. if the user has said something, then clear the output queue
-                2. and go back to step 1 Question or command
-                """
-
-                # Check if latest user response wants to change settings
-
-                # Generate question or command, given chat history, current web desc, current web url, url tree
-                question, command = self.get_question_or_command()
-
-                # If question, wait for user input
-                if question:
-                    self.send_output(question)
-                    user_response = self.receive_input(block=True)
-                # If command, send command to handler and crawl the new page
-                elif command:
-                    self.send_output(command)
-                    self.handle_command(command)
-
-                # Check if user has said anything
-                res = self.receive_input(block=False)
-                if res is not None:
-                    # Clear the output queue
-                    while not self._output_queue.empty():
-                        self._output_queue.get()
+    return response.choices[0].text
 
 
-        except KeyboardInterrupt:
-            print("\n[!] Ctrl+C detected, exiting gracefully.")
-            exit(0)
+def get_objective(chat_history):
+    prompt = objective_template.format(
+        chat_history=chat_history,
+    )
+
+    return openai.Completion.create(model="text-davinci-003",
+                                    prompt=prompt,
+                                    temperature=0.5,
+                                    best_of=10,
+                                    n=3,
+                                    max_tokens=50)
 
 
 def test_voice():
@@ -185,7 +203,7 @@ def main():
         )
 
     def get_gpt_command(objective, url, previous_command, browser_content, page_desc):
-        prompt = prompt_template
+        prompt = objective
         prompt = prompt.replace("$objective", objective)
         prompt = prompt.replace("$url", url[:100])
         prompt = prompt.replace("$previous_command", previous_command)

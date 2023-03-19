@@ -10,6 +10,20 @@ black_listed_elements = {"html", "head", "title", "meta", "iframe", "body", "scr
                          "::marker"}
 
 
+def get_page_description(eoi):
+    response = openai.Completion.create(
+        model="text-davinci-003",
+        prompt=f"Summarize this html to describe the website:\n\n{eoi}",
+        temperature=0.7,
+        max_tokens=256,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
+    )
+
+    return response.get("choices")[0].get("text")
+
+
 class Crawler:
     def __init__(self):
         openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -95,7 +109,7 @@ class Crawler:
     def enter(self):
         self.page.keyboard.press("Enter")
 
-    def get_elements_of_interest(self):
+    def get_page_contents(self):
         page = self.page
         page_element_buffer = self.page_element_buffer
         start = time.time()
@@ -418,44 +432,12 @@ class Crawler:
             id_counter += 1
 
         print("Parsing time: {:0.2f} seconds".format(time.time() - start))
-        return elements_of_interest
-
-    def get_page_description(self):
-        page = self.page
-        # content = page.inner_text()
-        # Find all the <a> elements on the page
-        links = page.query_selector_all('a')
-
-        link_data = []
-        for link in links:
-            href = link.get_attribute('href')
-
-            # Find all the child elements of the link and aggregate their text content
-            text = ' '.join([child.text_content().strip() for child in link.query_selector_all('*')]).strip()
-
-            if text != '':
-                # Add the href and text data to a dictionary and append it to the link_data list
-                link_data.append({'href': href, 'text': text})
-
-        pprint(link_data)
-        print("--------------")
-        exit()
-        response = openai.Completion.create(
-            model="text-davinci-003",  # gpt-3.5-turbo
-            prompt=f"Summarize this html to describe the website:\n\n{content}",
-            temperature=0.7,
-            max_tokens=256,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
-        print(response)
-        return response.get("choices")[0].get("text")
+        return elements_of_interest, get_page_description(elements_of_interest)
 
     def decide(self):
         page = self.page
         page_elements = self.get_elements_of_interest()
-        page_description = self.get_page_description()
+        page_description = get_page_description()
         print(page_description)
         print(page_elements)
         return page_elements, page_description
