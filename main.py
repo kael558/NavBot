@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from crawler import Crawler
 from IO.inputs import Voice
 from IO.outputs import Audio
-from prompts import prompt_template
+from prompts import question_or_command_prompt_template
 
 quiet = False
 if len(argv) >= 2:
@@ -27,7 +27,12 @@ if len(argv) >= 2:
             + "exercise caution when running suggested commands."
         )
 
+"""
 
+
+
+
+"""
 
 
 class NavBot:
@@ -39,6 +44,7 @@ class NavBot:
         self._output_queue = queue.Queue()  # Output to users
 
         self.chat_history = ""
+        self.commands = []
 
         self._inputs = {"Voice": Voice(self._settings, self._input_queue)}
         self._outputs = {"Audio": Audio(self._settings, self._output_queue)}
@@ -68,56 +74,94 @@ class NavBot:
         self.chat_history += "NavBot: " + text + "\n"
         self._output_queue.put(text)
 
+
     def get_question_or_command(self):
         # chat history
         # current web desc
         # current web url
         # url tree (list of urls)
 
+        prompt = question_or_command_prompt_template.format(
+            chat_history=self.chat_history,
+            browser_content=self._crawler.get_browser_content()[:4500],
+            page_desc=self._crawler.get_page_description(),
+            url=self._crawler.get_current_url(),
+            previous_command=self._crawler.get_previous_command(),
+        )
+
+        response = openai.Completion.create(model="text-davinci-003", prompt=prompt, temperature=0.5, best_of=10, n=3,
+                                            max_tokens=50)
+        return response.choices[0].text
+
+
+
         pass
+
+    def handle_command(self, command):  
+        """
+        run the command
+        update the url tree, web desc, and web url
+        """
+        self._crawler.run_command(command)
+
 
     def run(self):
         response = "Hi, I'm NavBot. I will be your guide on the web. How can I help you today?"
         self._output_queue.put(response)
         user_response = self.receive_input(block=True)
-
-        while True:
-            # Generate a question or generate a command
-            """
-            1. Question or command:
-            
-            1. if question
-            2. generate response with question and web desc, send the response to the user
-            3. wait for their input
-            
-            1. if command
-            2. generate response with command and web desc and send response to user
-            3. send the command to the handler and crawl the new page
-            4. check if the user has said anything
-            
-            1. if the user has said something, then clear the output queue
-            2. and go back to step 1 Question or command
-            """
-
-
-            res = self.receive_input(block=True)
+        try:
             while True:
+                # Generate a question or generate a command
+                """
 
+                1. user input
+                2. use vector db to check if input wants to change settings
+                3. given the chat history, generate a question or a command (could be nothing)
+     
+                1. if ask user question
+                2. generate response with question and web desc, send the response to the user
+                3. wait for their input
+
+                4. if no question
+                5. get objective of 
+                2. generate response with command and web desc and send response to user
+                3. send the command to the handler and crawl the new page
+                4. check if the user has said anything
+                
+                
+                1. if the user has said something, then clear the output queue
+                2. and go back to step 1 Question or command
+                """
+
+                # Check if latest user response wants to change settings
+
+
+                # Generate question or command, given chat history, current web desc, current web url, url tree
+                question, command = self.get_question_or_command()
+
+                # If question, wait for user input
+                if question:
+                    self.send_output(question)
+                    user_response = self.receive_input(block=True)
+                # If command, send command to handler and crawl the new page
+                elif command: 
+                    self.send_output(command)
+                    self.handle_command(command)
+                
+                # Check if user has said anything
+                res = self.receive_input()
                 if res is not None:
                     # Clear the output queue
+                    while not self._output_queue.empty():
+                        self._output_queue.get()
 
-                    # Process the input
-                    pass
-
-                    # Clear the output queue
-
-
-                # Send the output
-
-
-
-
-
+                
+        except KeyboardInterrupt:
+            print("\n[!] Ctrl+C detected, exiting gracefully.")
+            exit(0)
+                        
+                
+ 
 def test_voice():
     load_dotenv()
     settings = Settings()
@@ -151,30 +195,7 @@ def main():
                                             max_tokens=50)
         return response.choices[0].text
 
-    def run_cmd(cmd):
-        cmd = cmd.split("\n")[0]
-
-        if cmd.startswith("SCROLL UP"):
-            _crawler.scroll("up")
-        elif cmd.startswith("SCROLL DOWN"):
-            _crawler.scroll("down")
-        elif cmd.startswith("CLICK"):
-            commasplit = cmd.split(",")
-            id = commasplit[0].split(" ")[1]
-            _crawler.click(id)
-        elif cmd.startswith("TYPE"):
-            spacesplit = cmd.split(" ")
-            id = spacesplit[1]
-            text = spacesplit[2:]
-            text = " ".join(text)
-            # Strip leading and trailing double quotes
-            text = text[1:-1]
-
-            if cmd.startswith("TYPESUBMIT"):
-                text += '\n'
-            _crawler.type(id, text)
-
-        time.sleep(2)
+    
 
     settings = Settings()
 
@@ -187,6 +208,7 @@ def main():
     llm_response = "Hi, I'm NavBot. I will be your guide on the web. How can I help you today?"
 
     try:
+
         while True:
             output_type.output(llm_response)
             input_type.start()

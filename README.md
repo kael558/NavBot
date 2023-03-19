@@ -104,3 +104,16 @@ Audio is asynchronous so..
 
 
 
+"""
+User:
+ - brand preferences: 
+ - products wanted: 
+
+sephora
+maybelline
+mac
+nordstrom
+ulta
+nyx cosmetics
+beauty sense
+"""
