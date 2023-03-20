@@ -23,10 +23,10 @@ class Settings:
         self.push_to_talk: bool = False
         self.push_to_talk_key: str = "space"
 
-        self.keyword_detection: bool = True
+        self.keyword_detection: bool = False
         self.keyword: str = "Hey NavBot"
 
-        self.verbose_mode: bool = True
+        #self.verbose_mode: bool = True
 
         self.language: Literal["Afrikaans", "Arabic", "Armenian", "Azerbaijani", "Belarusian", "Bosnian", "Bulgarian",
         "Catalan", "Chinese", "Croatian", "Czech", "Danish", "Dutch", "English", "Estonian", "Finnish",
@@ -71,6 +71,24 @@ class Settings:
             return self.languages_index.get_nearest_neighbors(self.text_embedder.embed(text), 1)
         return None
 
+    def __str__(self):
+        result = ""
+        if self.push_to_talk:
+            result += "Push to talk is enabled with the key " + self.push_to_talk_key + "."
+        else:
+            result += "Push to talk is disabled."
+
+        if self.keyword_detection:
+            result += "Keyword detection is enabled with the keyword " + self.keyword + "."
+        else:
+            result += "Keyword detection is disabled."
+
+
+        result += "The input language is set to " + self.language + "."
+        result += "The verbosity length is set to " + self.verbosity_length + "."
+        result += "The talking speed is set to " + self.talking_speed + "."
+
+        return result
 
 def set_up_verifier(text_embedder):
     vectordb = {
@@ -93,16 +111,12 @@ def set_up_verifier(text_embedder):
                                       "Can you disable keyword detection?", "I don't want keyword detection",
                                       "Please record me all the time"],
 
-        "enable verbose mode": ["Can you enable verbose mode?", "I want to hear how the bot is navigating each page.",
-                                "I want to hear descriptions of what the bot is doing",
-                                "Can you tell me what the bot is doing?", "PLease let me know what the bot is doing"],
-        "disable verbose mode": ["Can you disable verbose mode?", "I don't want to hear what the bot is doing",
-                                 "I don't want to hear descriptions of what the bot is doing"],
+
 
         "talk more": ["Can you talk more?", "I want more information about the page",
-                      "Can you give longer descriptions?",
+                      "Can you give longer descriptions?", "I want more details on the page",
                       "Give me longer descriptions"],
-        "talk less": ["Can you talk less?", "I don't want so much information", "Can you give shorter descriptions?"],
+        "talk less": ["Can you talk less?", "I don't want so much information", "Can you give shorter descriptions?", "I want less details."],
         "talk faster": ["Can you talk faster?", "Can you increase your talking speed?", "Talk faster please",
                         "I want you to talk faster"],
         "talk slower": ["Can you talk slower?", "Can you decrease your talking speed?", "Talk slower please",
@@ -112,8 +126,17 @@ def set_up_verifier(text_embedder):
         "change language": ["Can you record other languages?", "Can you change the language to French?",
                             "I want to talk in a different language", "I want to speak in a different language",
                             "Can you the change the language?", "Can I talk in a different language?"],
+        "see settings": ["What are my settings?", "What are my current settings?", "What are my current settings?",
+                         "What are your settings?", "Can I see your settings?", "What settings are you on right now?"],
         "exit": ["I am finished", "Shut down the bot", "Stop", "Thank you for your help, I am finished"]
     }
+    """
+        "enable verbose mode": ["Can you enable verbose mode?", "I want to hear how the bot is navigating each page.",
+                                        "I want to hear descriptions of what the bot is doing",
+                                        "Can you tell me what the bot is doing?", "PLease let me know what the bot is doing"],
+                "disable verbose mode": ["Can you disable verbose mode?", "I don't want to hear what the bot is doing",
+                                         "I don't want to hear descriptions of what the bot is doing"],
+        """
 
     base_index = Annoy(1536, "settings/base.ann", "settings/base.json")
     metadatas, keys = [], []
@@ -141,3 +164,4 @@ def set_up_verifier(text_embedder):
     languages_index.save()
 
     return base_index, languages_index
+

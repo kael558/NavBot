@@ -1,7 +1,7 @@
 import queue
 
 from IO.inputs import Input
-
+import pyautogui
 
 class Keyboard(Input):
     _instance = None
@@ -18,7 +18,9 @@ class Keyboard(Input):
         pass
 
     def _stop(self):
-        pass
+        pyautogui.press('enter')
 
     def _input(self):
-        return input("YOUR INPUT: ")
+        x = input("YOUR INPUT: ")
+        print("INPUT: " + x)
+        return x

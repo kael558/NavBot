@@ -6,22 +6,13 @@ import openai
 from playwright.sync_api import sync_playwright
 
 from prompts import page_summary_template
+from text_gen_openai import generate
 
 black_listed_elements = {"html", "head", "title", "meta", "iframe", "body", "script", "style", "path", "svg", "br",
                          "::marker"}
 
 
-def get_page_description(url, eoi, verbosity):
-    prompt = page_summary_template(eoi, url, verbosity)
 
-    #co = cohere.Client(os.getenv("COHERE_KEY"))  # This is your trial API key
-    response = openai.Completion.create(model="text-davinci-003",
-                                        prompt=prompt,
-                                        temperature=0.7,
-                                        best_of=5,
-                                        n=1,
-                                        max_tokens=100)
-    return response.choices[0].text
 
 
 
@@ -116,7 +107,7 @@ class Crawler:
     def enter(self):
         self.page.keyboard.press("Enter")
 
-    def get_page_contents(self, verbosity: str):
+    def get_elements_of_interest(self):
         page = self.page
         page_element_buffer = self.page_element_buffer
         start = time.time()
@@ -439,8 +430,24 @@ class Crawler:
                 )
                 id_counter += 1
 
-        print("Parsing time: {:0.2f} seconds".format(time.time() - start))
-        return elements_of_interest, get_page_description(self.page.url, "\n".join(elements_of_interest), verbosity)
+        #print("Parsing time: {:0.2f} seconds".format(time.time() - start))
+        return elements_of_interest
+
+    def get_page_description(self, eoi, verbosity):
+        prompt = page_summary_template("\n".join(eoi), self.page.url, self.page.title(), verbosity)
+
+        # co = cohere.Client(os.getenv("COHERE_KEY"))  # This is your trial API key
+        response = generate(prompt=prompt,
+                            max_tokens=200,
+                            temperature=0.7,
+                            top_p=1,
+                            frequency_penalty=0.2,
+                            presence_penalty=0.2)
+
+        return response
+
+    def get_current_title(self):
+        return self.page.title()
 
     def get_current_url(self):
         return self.page.url
@@ -459,11 +466,10 @@ from dotenv import load_dotenv
 if __name__ == "__main__":
     load_dotenv()
     crawler = Crawler()
-    crawler.go_to_page("https://www.sephora.com/?country_switch=ca&lang=en")
-    eoi, page = crawler.get_page_contents("Short")
+    crawler.go_to_page("https://www.maybelline.ca/en-ca/lip-makeup/lip-color")
+
+    print(crawler.get_current_title())
     # page_desc = crawler.get_page_description()
-    print('\n'.join(eoi))
-    print(page)
 
     print("--------")
     # print(page_desc)
