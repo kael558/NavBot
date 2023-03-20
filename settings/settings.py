@@ -17,16 +17,11 @@ def supported_langagues():
 
 class Settings:
     def __init__(self):
-
-        # self.inputs: List[Input] = []
-        # self.outputs: List[Output] = []
-        self.push_to_talk: bool = False
+        self.push_to_talk: bool = True
         self.push_to_talk_key: str = "space"
 
         self.keyword_detection: bool = False
         self.keyword: str = "Hey NavBot"
-
-        #self.verbose_mode: bool = True
 
         self.language: Literal["Afrikaans", "Arabic", "Armenian", "Azerbaijani", "Belarusian", "Bosnian", "Bulgarian",
         "Catalan", "Chinese", "Croatian", "Czech", "Danish", "Dutch", "English", "Estonian", "Finnish",

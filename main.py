@@ -318,10 +318,10 @@ def run(tutorial: bool = False):
     output_thread = TextToSpeech()  # Output to users
     output_thread.start()
 
-    i = Keyboard(input_queue)
+    #i = Keyboard(input_queue)
+    #i.start()
+    i = Voice(settings, input_queue)
     i.start()
-    # i = Voice(settings, input_queue)
-    # i.start()
 
     chat_history = []
     send_output("Hi, I'm NavBot. I will be your guide on the web today.", chat_history, output_thread)
@@ -355,7 +355,7 @@ def run(tutorial: bool = False):
 
     try:
         while True:
-            send_output(page_intro, chat_history, output_thread)
+
             if new_page:
                 elements_of_interest = crawler.get_elements_of_interest()
                 print("Bot is getting page description")
@@ -368,7 +368,10 @@ def run(tutorial: bool = False):
                 page_intro = page[0] + "."
                 page_output = " ".join(page[1:])
                 print("PAGE desc")
+                send_output(page_intro, chat_history, output_thread)
                 send_output(page_output, chat_history, output_thread)
+            else:
+                send_output(page_intro, chat_history, output_thread)
             new_page = False
             send_output("What would you like to do next?", chat_history, output_thread)
 
@@ -387,7 +390,7 @@ def run(tutorial: bool = False):
                     send_output(str(settings), chat_history, output_thread)
                     continue
 
-                send_output("Can you confirm that you asked to me to change my settings?")
+                send_output("Can you confirm that you asked to me to change my settings?",chat_history, output_thread)
                 settings_change_confirmation = receive_input(input_queue, chat_history, output_thread,
                                                                    wait_for_user=True)
                 if confirmed(settings_change_confirmation.content, settings):
@@ -488,4 +491,4 @@ def run(tutorial: bool = False):
 
 
 if __name__ == "__main__":
-    run(tutorial=False)
+    run(tutorial=True)
