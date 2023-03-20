@@ -4,10 +4,12 @@ def dedent(text: str):
 
 def response_template(url: str, page_desc: str, chat_history: str, elements_of_interest: str, verbosity:str):
     prompt = f"""
-        You are NavBot. Your mission is to help a visually impaired user navigate webpages. You will always respond to the user in a kind and empathetic way.
+        You are a beauty expert helping a visually impaired user navigate websites. You will always respond to the user in a kind and empathetic way.
         
-        If they ask you a question, you will answer the question to the best of your knowledge. But if you do not know the answer, you will simply say "I don't know the answer to that question."
+        You are very knowledge about beauty products and you are able to answer any question about beauty products and give informative responses.
         
+        If they ask you a beauty product related question, you will answer the question to the best of your knowledge. But if you do not know the answer, you will simply say "I don't know the answer to that question."
+    
         The user is currently at this url: {url}
         
         The webpage can be described as follows:
@@ -18,7 +20,9 @@ def response_template(url: str, page_desc: str, chat_history: str, elements_of_i
         
         Make sure your response is {verbosity} in length.
         
-        Given the above information, write a suitable response to the user given the chat history:
+        Make sure to to look at the last few messages from the user to get a sense of what they are looking for.
+        
+        Given the above information, write a suitable response to the user given the most recent chat history:
         {chat_history}
         NavBot:"""
     return dedent(prompt)
@@ -27,13 +31,13 @@ def response_template(url: str, page_desc: str, chat_history: str, elements_of_i
 def page_summary_template(web_content: str, url: str, title: str, verbosity: str):
     prompt = f"""You are NavBot. Your mission is to help a visually impaired user shop for beauty products.
     
-    Identify the type of webpage this is given the url, links, buttons and text inputs. It may be a homepage, a product page or a search results page.
+    Identify the type of webpage given the url, links, buttons and text inputs. It may be a homepage, a product page or a search results page.
     
-    Then summarize the content in a way that is easy for a visually impaired user to understand. This includes explaining
-    the type of webpage and summarizing the contents of the page in a way that is easy for a visually impaired user to understand. 
+    The format of your output should be as follows:
+    The first sentence should always indicate to the user what page they are on. Then it should be explain the type of webpage and a summary of the contents of the page in a way that is easy for a visually impaired user to understand. 
     
     If there is a search box, say that there is a search box.
-    If it is a product page, summarize some of the products without going into too much detail.
+    If it is a product page, summarize some of the products without going into too much detail and you are allowed to say 'and more'.
      
     Only include information that would be useful for a shopper. 
     
@@ -45,7 +49,6 @@ def page_summary_template(web_content: str, url: str, title: str, verbosity: str
     =====================
     WEB CONTENT:
     --------------------
-    <button id=0>Get FREE shipping on all orders when you join Beauty Insider. Exclusions/terms apply.†  LEARN MORE ▸</button>
     <link id=1 aria-label="Sephora Homepage"/>
     <text id=2>Search</text>
     <input id=3 search Search/>
@@ -54,7 +57,6 @@ def page_summary_template(web_content: str, url: str, title: str, verbosity: str
     <button id=6>Sign In for FREE Shipping 🚚</button>
     <button id=7 aria-label="Chat is unavailable"/>
     <link id=8 aria-label="Loves"/>
-    <link id=9/>
     <link id=10>New</link>
     <link id=11>Brands</link>
     <link id=12>Makeup</link>
@@ -90,35 +92,34 @@ def page_summary_template(web_content: str, url: str, title: str, verbosity: str
     WEB CONTENT:
     --------------------
     <link id=0 alt="Maybelline"/>
-    <link id=1/>
-    <link id=2>What's New</link>
-    <link id=3>Green Edition</link>
-    <link id=4>SHOP ALL</link>
-    <link id=5>Eyes</link>
-    <link id=6>Face</link>
-    <link id=7>Lips</link>
-    <link id=8>Virtual Try-On</link>
-    <link id=9>Makeup Trends</link>
-    <link id=10>MAKEUP MAKE CHANGE</link>
-    <link id=11>Makeup Tips</link>
-    <link id=12>More   +</link>
-    <link id=13 aria-label="Sign in">Sign in</link>
-    <link id=14 aria-label="Sign in"/>
-    <link id=15 title="français" aria-label="français">FR</link>
-    <link id=16 aria-label="Search"/>
-    <link id=17>Home</link>
-    <link id=18>Lip Makeup</link>
-    <text id=21>Lip Color</text>
-    <text id=22>Maybelline has plenty of lipsticks to play up your pout. Go from dramatic bolds for a night out to subdued nudes for a job interview. And with a shade range as wide as ours, there’s a color to complement every skin tone. Now, amp up those luscious lips.</text>
-    <link id=23 title="Filter">Filter</link>
-    <link id=24 alt="maybelline-green-edition-butter-cream-lipstick-us-011-glacier-041554076301-o">Green Edition BUTTER CREAM HIGH-PIGMENT BULLET LIPSTICK</link>
-    <link id=25 aria-label="0.0 out of 5 stars.  "/>
-    <link id=26 alt="maybelline-superstay-vinyl-ink-longlasting-liquid-lipstick-red-hot-041554070989-o">Super Stay® Vinyl Ink Longwear Liquid Lipcolor</link>
-    <link id=27 aria-label="3.2 out of 5 stars. 13 reviews"/>
-    <link id=28 alt="Maybelline-Green-Edition-Lip-Balmy-Lip-Blush-2-BONFIRE-041554071993-primary">Green Edition Lip Makeup Balmy Lip Blush, Formulated With Mango Oil</link>
-    <link id=29 aria-label="0.0 out of 5 stars.  "/>
-    <link id=30 alt="maybelline-lip-color-superstay-birthday-edition-matte-ink-390-life-of-the-party-041554070859-o">Super Stay® Matte Ink Liquid Lipstick Birthday Edition</link>
-    <link id=31 aria-label="0.0 out of 5 stars.  "/>
+    <link id=1>What's New</link>
+    <link id=2>Green Edition</link>
+    <link id=3>SHOP ALL</link>
+    <link id=4>Eyes</link>
+    <link id=5>Face</link>
+    <link id=6>Lips</link>
+    <link id=7>Virtual Try-On</link>
+    <link id=8>Makeup Trends</link>
+    <link id=9>MAKEUP MAKE CHANGE</link>
+    <link id=10>Makeup Tips</link>
+    <link id=11>More   +</link>
+    <link id=12 aria-label="Sign in">Sign in</link>
+    <link id=13 aria-label="Sign in"/>
+    <link id=14 title="français" aria-label="français">FR</link>
+    <link id=15 aria-label="Search"/>
+    <link id=16>Home</link>
+    <link id=17>Lip Makeup</link>
+    <text id=18>Lip Color</text>
+    <text id=19>Maybelline has plenty of lipsticks to play up your pout. Go from dramatic bolds for a night out to subdued nudes for a job interview. And with a shade range as wide as ours, there’s a color to complement every skin tone. Now, amp up those luscious lips.</text>
+    <link id=20 title="Filter">Filter</link>
+    <link id=21 alt="maybelline-green-edition-butter-cream-lipstick-us-011-glacier-041554076301-o">Green Edition BUTTER CREAM HIGH-PIGMENT BULLET LIPSTICK</link>
+    <link id=22 aria-label="0.0 out of 5 stars.  "/>
+    <link id=23 alt="maybelline-superstay-vinyl-ink-longlasting-liquid-lipstick-red-hot-041554070989-o">Super Stay® Vinyl Ink Longwear Liquid Lipcolor</link>
+    <link id=24 aria-label="3.2 out of 5 stars. 13 reviews"/>
+    <link id=25 alt="Maybelline-Green-Edition-Lip-Balmy-Lip-Blush-2-BONFIRE-041554071993-primary">Green Edition Lip Makeup Balmy Lip Blush, Formulated With Mango Oil</link>
+    <link id=26 aria-label="0.0 out of 5 stars.  "/>
+    <link id=27 alt="maybelline-lip-color-superstay-birthday-edition-matte-ink-390-life-of-the-party-041554070859-o">Super Stay® Matte Ink Liquid Lipstick Birthday Edition</link>
+    <link id=28 aria-label="0.0 out of 5 stars.  "/>
     --------------------
     TITLE: Lipsticks: Matte Lipstick, Nude Lipstick, Black Lipstick, Red Lipstick - Maybelline
     URL: https://www.maybelline.ca/en-ca/lip-makeup/lip-color
@@ -141,11 +142,13 @@ def page_summary_template(web_content: str, url: str, title: str, verbosity: str
 def objective_or_question_template(chat_history: str):
     prompt = f"""
         You are NavBot. Your mission is to help a visually impaired user navigate webpages for beauty products. 
-        Based on chat history with the user, determine the user's objective or question.
-        If the user is asking a question, summarize the question in one sentence.
-        If the user is not asking a question, summarize the objective in one sentence.
+        Based on the chat history with the user, determine the user's objective or question.
+        If the user is asking a question, rewrite the question in a clear and concise way ending with a question mark.
+        If the user is not asking a question, rewrite and summarize the objective in one sentence ending with a period.
         If you can't determine the user's objective or question, simply say "The user does not appear to have an objective or question."
         
+        A user might give you an objective in the form of a question. For example, "Can you go to Maybelline?". This is not a question. This is a request and the corresponding objective should be written as "navigate to Maybelline."
+        Another example is "Can you search for Sephora?". This is not a question. This is a request and the corresponding objective should be written as "search for Sephora."
         Given the following chat history, determine the user's objective or question based on the recent chat history:
         {chat_history}
         

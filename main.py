@@ -5,6 +5,8 @@
 # Set OPENAI_API_KEY to your API key, and then run this from a terminal.
 #
 import multiprocessing
+import time
+
 import nltk
 import playsound
 import requests
@@ -230,12 +232,14 @@ def receive_input(input_queue: queue, chat_history: List[Message], output_thread
 
 def send_output(text: str, chat_history: Optional[List[Message]], output_thread: TextToSpeech):
     output_thread.say(text)
+    print("OUTPUT: " + text)
     if chat_history:
         if len(chat_history) > 4:
             chat_history.pop(0)
         chat_history.append(Message("NavBot", text))
 
-def get_objective_or_question(chat_history):
+
+def get_objective_or_question(chat_history) -> str:
     prompt = objective_or_question_template(
         chat_history="\n".join(map(str, chat_history)),
     )
@@ -248,6 +252,7 @@ def get_objective_or_question(chat_history):
                         max_tokens=50)
 
     return response
+
 
 def get_response(url: str, chat_history: List[Message], page_desc: str, elements_of_interest: str, settings: Settings):
     prompt = response_template(
@@ -268,7 +273,8 @@ def get_response(url: str, chat_history: List[Message], page_desc: str, elements
         stop=["\n"]
     )
 
-    return response.choices[0].text
+    return response
+
 
 def get_command(crawler: Crawler, objective: str, elements_of_interest: str, page_description):
     prompt = command_template(
@@ -283,13 +289,10 @@ def get_command(crawler: Crawler, objective: str, elements_of_interest: str, pag
                         presence_penalty=0,
                         best_of=1,
                         top_p=1,
-                       temperature=0,
-                       max_tokens=50)
+                        temperature=0,
+                        max_tokens=50)
 
     return response
-
-
-
 
 
 def test_voice():
@@ -330,7 +333,7 @@ def run(tutorial: bool = False):
             "It includes things like my voice, my talking speed and the level of detail that I go into.",
             None, output_thread)
         send_output(
-            "Some other settings include your language (I support over 150 languages), push to talk and keyword detection so it doesn't record audio unless you say the keyword",
+            "Some other settings include your language (I support over 150 languages), push to talk and keyword detection.",
             None,
             output_thread)
         send_output("You can change my settings by saying something like 'change my language to Spanish'", None,
@@ -345,35 +348,49 @@ def run(tutorial: bool = False):
                     output_thread)
         send_output("That's it! You can now use me to navigate the web. Have fun!", None, output_thread)
 
-    wait_user_input = True
-    prev_user_response = ""
-    objective_or_question = None
+    page_intro = "You are on the Google Search homepage."
+    page_desc = None
+    elements_of_interest = None
+    new_page = True
 
     try:
         while True:
-            send_output("You are currently on " + crawler.get_current_title(), chat_history, output_thread)
-            if wait_user_input:
-                # Get user input
-                send_output("What would you like to do?", chat_history, output_thread)
+            send_output(page_intro, chat_history, output_thread)
+            if new_page:
+                elements_of_interest = crawler.get_elements_of_interest()
+                print("Bot is getting page description")
+                if crawler.get_current_url() == "https://www.google.com/":
+                    page_desc = "You are on the Google Search homepage. There is a search box and links to Gmail, Images, Apps, Advertising and various other services."
+                else:
+                    send_output("Please wait while I get the page description", chat_history, output_thread)
+                    page_desc = crawler.get_page_description(elements_of_interest, settings.verbosity_length)
+                page = page_desc.split(".")
+                page_intro = page[0] + "."
+                page_output = " ".join(page[1:])
+                print("PAGE desc")
+                send_output(page_output, chat_history, output_thread)
+            new_page = False
+            send_output("What would you like to do next?", chat_history, output_thread)
 
             user_response = receive_input(input_queue, chat_history, output_thread,
-                                          wait_for_user=wait_user_input) or prev_user_response
-            wait_user_input = True
+                                          wait_for_user=True)
 
-            if user_response != prev_user_response:  # new user response
-                prev_user_response = user_response
+            settings_change = check_for_settings_change(settings, user_response)
+            print("Settings change: " + str(settings_change))
+            if settings_change is not None:
+                output_thread.stop()  # clear current engine queue
+                if settings_change[0] == "exit":
+                    break
 
-                settings_change = check_for_settings_change(settings, user_response)
-                print("Settings change: " + str(settings_change))
-                if settings_change is not None:
-                    if settings_change[0] == "exit":
-                        break
+                if settings_change[0] == "see settings":
+                    send_output("You have asked to see my current settings.", chat_history, output_thread)
+                    send_output(str(settings), chat_history, output_thread)
+                    continue
 
-                    if settings_change[0] == "see settings":
-                        send_output("You have asked to see my current settings.", chat_history, output_thread)
-                        send_output(str(settings), chat_history, output_thread)
-                        continue
-
+                send_output("Can you confirm that you asked to me to change my settings?")
+                settings_change_confirmation = receive_input(input_queue, chat_history, output_thread,
+                                                                   wait_for_user=True)
+                if confirmed(settings_change_confirmation.content, settings):
                     # Ask the user to confirm the settings change
                     if settings_change[1] == "language":
                         output = "Shall I change your language to " + settings_change[2] + "?"
@@ -381,9 +398,10 @@ def run(tutorial: bool = False):
                         output = "Shall I " + settings_change[0] + "?"
 
                     send_output(output, chat_history, output_thread)
-                    settings_change_confirmation = receive_input(input_queue, chat_history, output_thread, block=True)
+                    settings_change_value_confirmation = receive_input(input_queue, chat_history, output_thread,
+                                                                 wait_for_user=True)
 
-                    if confirmed(settings_change_confirmation.content, settings):
+                    if confirmed(settings_change_value_confirmation.content, settings):
                         # Change the settings
                         settings.change_setting(settings_change)
                         if settings_change[1] == "voice":
@@ -392,35 +410,30 @@ def run(tutorial: bool = False):
                             output_thread.set_talking_speed(settings_change[2])
 
                         send_output("Great. I have changed the settings.", chat_history, output_thread)
-                        continue
                     else:
                         send_output("Okay. I will not change the settings.", chat_history, output_thread)
-                        continue
+                    continue
+                else:
+                    send_output("My mistake, it seems you did not ask me to change my settings.", chat_history, output_thread)
 
-                output_thread.stop()
-                send_output("Ok, please give me some time to figure out the best way to handle your request.",
-                            chat_history, output_thread)
-                print("Bot is getting objective or question")
-                objective_or_question = get_objective_or_question(chat_history)
-                print("Objective or Question: " + objective_or_question)
+            output_thread.stop()
+            send_output("Ok, please give me some time to process your request.",
+                        chat_history, output_thread)
+
+            objective_or_question = get_objective_or_question(chat_history)
+            print("Objective or Question: " + objective_or_question)
 
             # User does not have an objective or question
             if objective_or_question is None or objective_or_question == "The user does not appear to have an objective or question.":
+                send_output("I am sorry, I did not understand your request.", chat_history, output_thread)
                 continue
 
-            # Get web elements
-            elements_of_interest = crawler.get_elements_of_interest()
-            print("Bot is getting page description")
-            page_desc = crawler.get_page_description(elements_of_interest, settings.verbosity_length)
-            print("PAGE desc")
-            print(page_desc)
-
+            send_output("Ok, I understand your request.", chat_history, output_thread)
             if objective_or_question.endswith("?"):  # the user has a question
                 question = objective_or_question
                 chat_history.append(Message("User", question))  # Manually add it to chat history
 
-                output_thread.stop()
-                send_output("Ok, now I am finding an answer for your question.", chat_history, output_thread)
+                send_output("Let me find an answer for your question.", chat_history, output_thread)
 
                 print("Bot is getting response")
                 response = get_response(crawler.get_current_url(), chat_history, page_desc,
@@ -432,8 +445,7 @@ def run(tutorial: bool = False):
             else:  # the user has an objective
                 objective = objective_or_question
 
-                output_thread.stop()
-                send_output("Ok, now I am figuring out an appropriate action.", chat_history,
+                send_output("Let me figure out the next step.", chat_history,
                             output_thread)
                 print("Bot is getting command")
                 command = get_command(crawler, objective, "\n".join(elements_of_interest)[:1500],
@@ -446,12 +458,13 @@ def run(tutorial: bool = False):
 
                 if command == "FINISH":
                     break
+                elif command.startswith("TYPE") or command.startswith("CLICK"):
+                    new_page = True
+                else:
+                    new_page = False
 
                 # Run command
                 crawler.run_command(command)
-                wait_user_input = False
-
-
     except KeyboardInterrupt:
         print("\n[!] Ctrl+C detected, exiting gracefully.")
     except requests.exceptions.Timeout:
@@ -461,10 +474,12 @@ def run(tutorial: bool = False):
             None, output_thread)
     except openai.error.InvalidRequestError:
         output_thread.stop()
-        send_output("I'm sorry, the large language model is currently unavailable. Please try again later.", None, output_thread)
-    except Exception as e:
+        send_output("I'm sorry, the large language model is currently unavailable. Please try again later.", None,
+                    output_thread)
+    """except Exception as e:
+        print(e)
         output_thread.stop()
-        send_output("I'm sorry, I ran into an unknown error. Please contact the admin.", None, output_thread)
+        send_output("I'm sorry, I ran into an unknown error. Please contact the admin.", None, output_thread)"""
     crawler.close()
     i.stop()
     send_output("Thank you for using NavBot. Goodbye!", chat_history, output_thread)
@@ -473,4 +488,4 @@ def run(tutorial: bool = False):
 
 
 if __name__ == "__main__":
-    run(tutorial=True)
+    run(tutorial=False)

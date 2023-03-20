@@ -18,6 +18,7 @@ class Keyboard(Input):
         pass
 
     def _stop(self):
+        pyautogui.press('x')
         pyautogui.press('enter')
 
     def _input(self):

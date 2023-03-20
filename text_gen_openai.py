@@ -37,8 +37,10 @@ def generate(**kwargs):
                              headers=headers,
                              timeout=20
                              )
-
-    return response.json()['choices'][0]['text']
+    r_json = response.json()
+    print("GENERATE RESULT")
+    print(r_json)
+    return response.json()['choices'][0]['text'].strip()
 
 if __name__ == "__main__":
     load_dotenv()
