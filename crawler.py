@@ -1,27 +1,29 @@
-from sys import platform
 import os
-import openai
-
-from pprint import pprint
-from playwright.sync_api import sync_playwright
 import time
+from sys import platform
+
+import openai
+from playwright.sync_api import sync_playwright
+
+from prompts import page_summary_template
 
 black_listed_elements = {"html", "head", "title", "meta", "iframe", "body", "script", "style", "path", "svg", "br",
                          "::marker"}
 
 
-def get_page_description(eoi):
-    response = openai.Completion.create(
-        model="text-davinci-003",
-        prompt=f"Summarize this html to describe the website:\n\n{eoi}",
-        temperature=0.7,
-        max_tokens=256,
-        top_p=1,
-        frequency_penalty=0,
-        presence_penalty=0
-    )
+def get_page_description(url, eoi, verbosity):
+    prompt = page_summary_template(eoi, url, verbosity)
 
-    return response.get("choices")[0].get("text")
+    #co = cohere.Client(os.getenv("COHERE_KEY"))  # This is your trial API key
+    response = openai.Completion.create(model="text-davinci-003",
+                                        prompt=prompt,
+                                        temperature=0.7,
+                                        best_of=5,
+                                        n=1,
+                                        max_tokens=100)
+    return response.choices[0].text
+
+
 
 
 class Crawler:
@@ -39,6 +41,8 @@ class Crawler:
         self.page.set_viewport_size({"width": 1280, "height": 1080})
         self.url_history = []
         self.commands = []
+        self.context = self.browser.new_context(permissions=["geolocation"])
+        self.context.grant_permissions(["geolocation"])
 
     def run_command(self, cmd):
         cmd = cmd.split("\n")[0]
@@ -63,8 +67,11 @@ class Crawler:
             if cmd.startswith("TYPESUBMIT"):
                 text += '\n'
             self.type(id, text)
-
+        self.commands.append(cmd)
         time.sleep(2)
+        if self.page.url != self.url_history[-1]:
+            self.url_history.append(self.page.url)
+
 
     def go_to_page(self, url):
         self.page.goto(url=url if "://" in url else "http://" + url)
@@ -109,7 +116,7 @@ class Crawler:
     def enter(self):
         self.page.keyboard.press("Enter")
 
-    def get_page_contents(self):
+    def get_page_contents(self, verbosity: str):
         page = self.page
         page_element_buffer = self.page_element_buffer
         start = time.time()
@@ -421,32 +428,30 @@ class Crawler:
 
             page_element_buffer[id_counter] = element
 
-            if inner_text != "":
+            if len(inner_text) >= 2:
                 elements_of_interest.append(
                     f"""<{converted_node_name} id={id_counter}{meta}>{inner_text}</{converted_node_name}>"""
                 )
-            else:
+                id_counter += 1
+            elif len(meta) >= 2:
                 elements_of_interest.append(
                     f"""<{converted_node_name} id={id_counter}{meta}/>"""
                 )
-            id_counter += 1
+                id_counter += 1
 
         print("Parsing time: {:0.2f} seconds".format(time.time() - start))
-        return elements_of_interest, get_page_description(elements_of_interest)
-
-    def decide(self):
-        page = self.page
-        page_elements = self.get_elements_of_interest()
-        page_description = get_page_description()
-        print(page_description)
-        print(page_elements)
-        return page_elements, page_description
+        return elements_of_interest, get_page_description(self.page.url, "\n".join(elements_of_interest), verbosity)
 
     def get_current_url(self):
         return self.page.url
 
     def get_previous_command(self):
+        if len(self.commands) == 0:
+            return None
         return self.commands[-1]
+
+    def close(self):
+        self.browser.close()
 
 
 from dotenv import load_dotenv
@@ -454,10 +459,11 @@ from dotenv import load_dotenv
 if __name__ == "__main__":
     load_dotenv()
     crawler = Crawler()
-    crawler.go_to_page("https://www.sephora.com/ca/en/shop/eyeshadow-palettes")
-    eoi = crawler.get_elements_of_interest()
+    crawler.go_to_page("https://www.sephora.com/?country_switch=ca&lang=en")
+    eoi, page = crawler.get_page_contents("Short")
     # page_desc = crawler.get_page_description()
     print('\n'.join(eoi))
+    print(page)
 
     print("--------")
     # print(page_desc)

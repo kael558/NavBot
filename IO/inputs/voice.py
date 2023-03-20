@@ -1,14 +1,18 @@
 import os
 import queue
 import threading
-
+import time
+import winsound
 import openai
 import speech_recognition as sr
+from dotenv import load_dotenv
+import playsound
 
 from IO.inputs.input import Input
 import io
 
-from settings import Settings
+from settings.settings import Settings
+import keyboard
 
 
 class NamedBufferedReader(io.BufferedReader):
@@ -54,17 +58,20 @@ class Voice(Input):
 
         while not self._stop_event.is_set():
             try:
-
                 # use the microphone as source for input.
                 with sr.Microphone() as source:
 
                     # wait for a second to let the recognizer
                     # adjust the energy threshold based on
                     # the surrounding noise level
-                    r.adjust_for_ambient_noise(source, duration=0.2)
+                    r.adjust_for_ambient_noise(source, duration=0.5)
 
+                    if self.settings.push_to_talk:
+                        keyboard.wait(self.settings.push_to_talk_key, suppress=True)
+
+                    #playsound.playsound("mic_on.wav", block=True)
                     # listens for the user's input
-                    audio = r.listen(source, timeout=60)
+                    audio = r.listen(source)
 
                     # Put audio segment in queue
                     self.transcribe_queue.put(audio.get_wav_data())
@@ -91,6 +98,18 @@ class Voice(Input):
         else:
             transcript = openai.Audio.transcribe("whisper-1", audio_file)
         audio_file.close()
-        print("--TRANSCRIPT--")
-        print(transcript)
-        return transcript
+
+        text = str(transcript.text).strip()
+        if not isEnglish(text) or text.startswith("Thank") or text == ". . . . .":
+            return None
+
+        print("Transcript: " + text)
+        return text
+
+def isEnglish(s):
+    try:
+        s.encode(encoding='utf-8').decode('ascii')
+    except UnicodeDecodeError:
+        return False
+    else:
+        return True

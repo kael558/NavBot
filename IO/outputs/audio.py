@@ -3,7 +3,7 @@ import queue
 import pyttsx3
 
 from IO.outputs.output import Output
-from settings import Settings
+from settings.settings import Settings
 
 
 class Audio(Output):
