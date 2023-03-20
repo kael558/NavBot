@@ -6,22 +6,13 @@ import openai
 from playwright.sync_api import sync_playwright
 
 from prompts import page_summary_template
+from text_gen_openai import generate
 
 black_listed_elements = {"html", "head", "title", "meta", "iframe", "body", "script", "style", "path", "svg", "br",
                          "::marker"}
 
 
-def get_page_description(url, eoi, verbosity):
-    prompt = page_summary_template(eoi, url, verbosity)
 
-    #co = cohere.Client(os.getenv("COHERE_KEY"))  # This is your trial API key
-    response = openai.Completion.create(model="text-davinci-003",
-                                        prompt=prompt,
-                                        temperature=0.7,
-                                        best_of=5,
-                                        n=1,
-                                        max_tokens=100)
-    return response.choices[0].text
 
 
 
@@ -39,7 +30,6 @@ class Crawler:
 
         self.page = self.browser.new_page()
         self.page.set_viewport_size({"width": 1280, "height": 1080})
-        self.url_history = []
         self.commands = []
         self.context = self.browser.new_context(permissions=["geolocation"])
         self.context.grant_permissions(["geolocation"])
@@ -68,9 +58,8 @@ class Crawler:
                 text += '\n'
             self.type(id, text)
         self.commands.append(cmd)
-        time.sleep(2)
-        if self.page.url != self.url_history[-1]:
-            self.url_history.append(self.page.url)
+        time.sleep(1)
+
 
 
     def go_to_page(self, url):
@@ -78,7 +67,6 @@ class Crawler:
 
         self.client = self.page.context.new_cdp_session(self.page)
         self.page_element_buffer = {}
-        self.url_history.append(url)
 
     def scroll(self, direction):
         if direction == "up":
@@ -116,10 +104,9 @@ class Crawler:
     def enter(self):
         self.page.keyboard.press("Enter")
 
-    def get_page_contents(self, verbosity: str):
+    def get_elements_of_interest(self):
         page = self.page
         page_element_buffer = self.page_element_buffer
-        start = time.time()
 
         page_state_as_text = []
 
@@ -127,16 +114,14 @@ class Crawler:
         if platform == "darwin" and device_pixel_ratio == 1:  # lies
             device_pixel_ratio = 2
 
-        win_scroll_x = page.evaluate("window.scrollX")
-        win_scroll_y = page.evaluate("window.scrollY")
+        page.evaluate("window.scrollY")
         win_upper_bound = page.evaluate("window.pageYOffset")
         win_left_bound = page.evaluate("window.pageXOffset")
         win_width = page.evaluate("window.screen.width")
         win_height = page.evaluate("window.screen.height")
         win_right_bound = win_left_bound + win_width
         win_lower_bound = win_upper_bound + win_height
-        document_offset_height = page.evaluate("document.body.offsetHeight")
-        document_scroll_height = page.evaluate("document.body.scrollHeight")
+
 
         #		percentage_progress_start = (win_upper_bound / document_scroll_height) * 100
         #		percentage_progress_end = (
@@ -166,25 +151,18 @@ class Crawler:
         attributes = nodes["attributes"]
         node_value = nodes["nodeValue"]
         parent = nodes["parentIndex"]
-        node_types = nodes["nodeType"]
+
         node_names = nodes["nodeName"]
         is_clickable = set(nodes["isClickable"]["index"])
 
-        text_value = nodes["textValue"]
-        text_value_index = text_value["index"]
-        text_value_values = text_value["value"]
 
         input_value = nodes["inputValue"]
         input_value_index = input_value["index"]
         input_value_values = input_value["value"]
 
-        input_checked = nodes["inputChecked"]
         layout = document["layout"]
         layout_node_index = layout["nodeIndex"]
         bounds = layout["bounds"]
-
-        cursor = 0
-        html_elements_text = []
 
         child_nodes = {}
         elements_in_view_port = []
@@ -387,10 +365,6 @@ class Crawler:
             node_name = element.get("node_name")
             node_value = element.get("node_value")
             is_clickable = element.get("is_clickable")
-            origin_x = element.get("origin_x")
-            origin_y = element.get("origin_y")
-            center_x = element.get("center_x")
-            center_y = element.get("center_y")
             meta_data = element.get("node_meta")
 
             inner_text = f"{node_value} " if node_value else ""
@@ -428,19 +402,34 @@ class Crawler:
 
             page_element_buffer[id_counter] = element
 
-            if len(inner_text) >= 2:
+            if inner_text != "":
                 elements_of_interest.append(
                     f"""<{converted_node_name} id={id_counter}{meta}>{inner_text}</{converted_node_name}>"""
                 )
-                id_counter += 1
-            elif len(meta) >= 2:
+            else:
                 elements_of_interest.append(
                     f"""<{converted_node_name} id={id_counter}{meta}/>"""
                 )
-                id_counter += 1
+            id_counter += 1
 
-        print("Parsing time: {:0.2f} seconds".format(time.time() - start))
-        return elements_of_interest, get_page_description(self.page.url, "\n".join(elements_of_interest), verbosity)
+        #print("Parsing time: {:0.2f} seconds".format(time.time() - start))
+        return elements_of_interest
+
+    def get_page_description(self, eoi, verbosity):
+        prompt = page_summary_template("\n".join(eoi)[:1300], self.page.url, self.page.title(), verbosity)
+
+        # co = cohere.Client(os.getenv("COHERE_KEY"))  # This is your trial API key
+        response = generate(prompt=prompt,
+                            max_tokens=200,
+                            temperature=0.7,
+                            top_p=1,
+                            frequency_penalty=0.2,
+                            presence_penalty=0.2)
+
+        return response
+
+    def get_current_title(self):
+        return self.page.title()
 
     def get_current_url(self):
         return self.page.url
@@ -459,11 +448,11 @@ from dotenv import load_dotenv
 if __name__ == "__main__":
     load_dotenv()
     crawler = Crawler()
-    crawler.go_to_page("https://www.sephora.com/?country_switch=ca&lang=en")
-    eoi, page = crawler.get_page_contents("Short")
+    crawler.go_to_page("https://www.google.com/")
+
+    print(crawler.get_current_title())
+    print(crawler.get_elements_of_interest())
     # page_desc = crawler.get_page_description()
-    print('\n'.join(eoi))
-    print(page)
 
     print("--------")
     # print(page_desc)

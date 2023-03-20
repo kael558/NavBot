@@ -103,6 +103,12 @@ class Voice(Input):
         if not isEnglish(text) or text.startswith("Thank") or text == ". . . . .":
             return None
 
+        if self.settings.keyword_detection:
+            if text.startswith(self.settings.keyword):
+                text = text[len(self.settings.keyword):]
+            else:
+                return None
+
         print("Transcript: " + text)
         return text
 

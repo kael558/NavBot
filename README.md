@@ -127,3 +127,10 @@ ulta
 nyx cosmetics
 beauty sense
 """
+
+ """  except requests.exceptions.Timeout:
+                send_output(
+                    "I'm sorry, I'm having trouble connecting to the large language model. Please try again later.",
+                    chat_history, output_thread)
+                break
+"""
